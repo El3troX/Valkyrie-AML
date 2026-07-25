@@ -285,7 +285,7 @@ async def network_data(max_nodes: int = 60):
         ppr = {}
 
     # Pick top accounts by risk score
-    capped = min(max_nodes, 60)  # hard cap at 60 nodes for readability
+    capped = min(max_nodes, 150)  # cap at 150 nodes for full picture
     sorted_accs = sorted(all_risk.items(), key=lambda x: x[1], reverse=True)[:capped]
 
     # --- Build edges FIRST to find connected accounts ---
@@ -301,8 +301,8 @@ async def network_data(max_nodes: int = 60):
             edges_raw[key]["amount"] += float(row["Amount"])
             edges_raw[key]["count"] += 1
 
-    # Keep only top-80 edges by amount so graph isn't tangled
-    sorted_edges = sorted(edges_raw.values(), key=lambda e: e["amount"], reverse=True)[:80]
+    # Keep only top-200 edges by amount so graph isn't tangled
+    sorted_edges = sorted(edges_raw.values(), key=lambda e: e["amount"], reverse=True)[:200]
 
     # Only include nodes that appear in at least one edge
     connected = set()

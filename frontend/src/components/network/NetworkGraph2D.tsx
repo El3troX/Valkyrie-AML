@@ -53,13 +53,23 @@ export const NetworkGraph2D: React.FC<NetworkGraph2DProps> = ({ data, onNodeClic
     dragging: false, startX: 0, startY: 0, dragNode: null,
   });
   const hoveredNodeRef = useRef<SimNode | null>(null);
+  const selectedNodeRef = useRef<SimNode | null>(null);
   const [hoveredNode, setHoveredNode] = useState<SimNode | null>(null);
+  const [selectedNode, setSelectedNodeState] = useState<SimNode | null>(null);
+  const setSelectedNode = useCallback((node: SimNode | null) => {
+    selectedNodeRef.current = node;
+    setSelectedNodeState(node);
+  }, []);
+  const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
   const [showLegend, setShowLegend] = useState(true);
   const tickRef = useRef(0);
 
   // Initialize force simulation
   const initSim = useCallback(() => {
     if (!containerRef.current || !data.nodes.length) return;
+
+    setSelectedNode(null);
+    setTransform({ x: 0, y: 0, scale: 1 });
 
     const W = containerRef.current.clientWidth || 900;
     const H = containerRef.current.clientHeight || 600;
@@ -173,7 +183,12 @@ export const NetworkGraph2D: React.FC<NetworkGraph2DProps> = ({ data, onNodeClic
       n.x += n.vx;
       n.y += n.vy;
     }
-  }, []);
+
+    // Force layout position synchronization for selected overlay
+    if (selectedNodeRef.current) {
+      setTransform({ ...transformRef.current });
+    }
+  }, [selectedNode]);
 
   // Draw frame
   const draw = useCallback(() => {
@@ -526,6 +541,7 @@ export const NetworkGraph2D: React.FC<NetworkGraph2DProps> = ({ data, onNodeClic
         } else {
           transformRef.current.x += pos.x - startX;
           transformRef.current.y += pos.y - startY;
+          setTransform({ ...transformRef.current });
         }
         dragRef.current.startX = pos.x;
         dragRef.current.startY = pos.y;
@@ -552,8 +568,14 @@ export const NetworkGraph2D: React.FC<NetworkGraph2DProps> = ({ data, onNodeClic
       // Click detection (small movement)
       const dx = pos.x - startX;
       const dy = pos.y - startY;
-      if (Math.sqrt(dx * dx + dy * dy) < 5 && dragNode && onNodeClick) {
-        onNodeClick(dragNode.id);
+      if (Math.sqrt(dx * dx + dy * dy) < 5) {
+        if (dragNode) {
+          // Select the clicked node to open interactive overlay panel
+          setSelectedNode(dragNode);
+        } else {
+          // Clicked background empty space: close overlay panel
+          setSelectedNode(null);
+        }
       }
 
       dragRef.current = { dragging: false, startX: 0, startY: 0, dragNode: null };
@@ -568,12 +590,15 @@ export const NetworkGraph2D: React.FC<NetworkGraph2DProps> = ({ data, onNodeClic
       transformRef.current.x = pos.x - (pos.x - transformRef.current.x) * (newScale / transformRef.current.scale);
       transformRef.current.y = pos.y - (pos.y - transformRef.current.y) * (newScale / transformRef.current.scale);
       transformRef.current.scale = newScale;
+      setTransform({ ...transformRef.current });
     };
 
     const onDblClick = (e: MouseEvent) => {
       const pos = getPos(e);
       const node = getNodeAtPoint(pos.x, pos.y);
-      if (node && onNodeClick) onNodeClick(node.id);
+      if (node) {
+        setSelectedNode(node);
+      }
     };
 
     canvas.addEventListener('mousedown', onMouseDown);
@@ -589,16 +614,19 @@ export const NetworkGraph2D: React.FC<NetworkGraph2DProps> = ({ data, onNodeClic
       canvas.removeEventListener('wheel', onWheel);
       canvas.removeEventListener('dblclick', onDblClick);
     };
-  }, [getNodeAtPoint, onNodeClick]);
+  }, [getNodeAtPoint, onNodeClick, setSelectedNode]);
 
   const handleZoomIn = () => {
     transformRef.current.scale = Math.min(4, transformRef.current.scale * 1.25);
+    setTransform({ ...transformRef.current });
   };
   const handleZoomOut = () => {
     transformRef.current.scale = Math.max(0.15, transformRef.current.scale * 0.8);
+    setTransform({ ...transformRef.current });
   };
   const handleReset = () => {
     transformRef.current = { x: 0, y: 0, scale: 1 };
+    setTransform({ ...transformRef.current });
     initSim();
   };
 
@@ -672,6 +700,48 @@ export const NetworkGraph2D: React.FC<NetworkGraph2DProps> = ({ data, onNodeClic
           Scroll to zoom · Drag to pan · Click node
         </div>
       </div>
+
+      {/* Floating selected node compliance investigation overlay card */}
+      {selectedNode && (
+        <div 
+          style={{
+            left: `${selectedNode.x * transform.scale + transform.x + 15}px`,
+            top: `${selectedNode.y * transform.scale + transform.y - 55}px`
+          }}
+          className="absolute z-30 bg-[#F2F0EB] border-3 border-black p-4 w-[240px] [box-shadow:4px_4px_0_#0A0A0A] font-mono text-xs flex flex-col gap-2 pointer-events-auto"
+        >
+          <div 
+            className="font-display font-bold text-[9px] px-2.5 py-1.5 uppercase tracking-wider text-white border-2 border-black flex justify-between items-center"
+            style={{ backgroundColor: selectedNode.color }}
+          >
+            <span>{getRiskLabel(selectedNode.color)}</span>
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedNode(null);
+              }}
+              className="font-bold text-white hover:opacity-80 text-[10px] bg-black/30 w-4 h-4 flex items-center justify-center border border-white/20 rounded cursor-pointer"
+            >
+              ×
+            </button>
+          </div>
+          <div className="text-[#0A0A0A] text-[9.5px] space-y-1.5 mt-1.5 font-bold">
+            <div className="truncate">ACC: {selectedNode.id}</div>
+            <div>RISK: {(selectedNode.risk_score * 100).toFixed(1)}%</div>
+            <div>PPR: {(selectedNode.pagerank * 100).toFixed(2)}%</div>
+          </div>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onNodeClick) onNodeClick(selectedNode.id);
+              setSelectedNode(null);
+            }}
+            className="w-full mt-2 font-display font-extrabold text-[9px] uppercase tracking-wider border-2 border-black py-2 bg-[#D4A843] hover:bg-[#D4A843]/85 text-black transition-colors [box-shadow:2px_2px_0_#0A0A0A] cursor-pointer"
+          >
+            Start Investigation
+          </button>
+        </div>
+      )}
     </div>
   );
 };

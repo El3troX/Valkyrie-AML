@@ -56,7 +56,7 @@ export default function Dashboard() {
       .then((data) => setAnomaliesData(data.anomalies))
       .catch((err) => console.error('Error fetching top anomalies', err));
 
-    api.getNetworkData(60)
+    api.getNetworkData(150)
       .then((data) => setNetworkData(data))
       .catch((err) => console.error('Error fetching network data', err));
   };
@@ -314,7 +314,7 @@ export default function Dashboard() {
                     </p>
                   </div>
                   <button
-                    onClick={() => api.getNetworkData(60).then(setNetworkData)}
+                    onClick={() => api.getNetworkData(150).then(setNetworkData)}
                     className="font-mono text-[9px] uppercase tracking-wider border-2 border-black px-3 py-1.5 bg-[#F2F0EB] hover:bg-[#D4A843] transition-colors [box-shadow:2px_2px_0_#0A0A0A] flex-shrink-0 ml-4"
                   >
                     ↺ Refresh
