@@ -294,20 +294,20 @@ export const NetworkGraph2D: React.FC<NetworkGraph2DProps> = ({ data, onNodeClic
         ctx.lineTo(px2, py2);
       }
       ctx.strokeStyle = edgeColor;
-      ctx.lineWidth = isHighRisk ? 1.5 / scale : 1.0 / scale;
+      ctx.lineWidth = isHighRisk ? 2.2 : 1.2;
       
       // Animated dashed effect for high risk edges
       if (isHighRisk) {
-        ctx.setLineDash([4 / scale, 4 / scale]);
-        ctx.lineDashOffset = -tickRef.current * 0.2;
+        ctx.setLineDash([6, 6]);
+        ctx.lineDashOffset = -tickRef.current * 0.25;
       } else {
         ctx.setLineDash([]);
       }
       ctx.stroke();
       ctx.setLineDash([]); // Reset line dash
 
-      // Draw arrowhead at px2, py2 aligned with tangent
-      const arrowLen = 8 / scale;
+      // Draw arrowhead at px2, py2 aligned with tangent (scales naturally with zoom)
+      const arrowLen = 9;
       const arrowAngle = 0.4;
       const nxEnd = dxEnd / distEnd;
       const nyEnd = dyEnd / distEnd;
@@ -455,7 +455,8 @@ export const NetworkGraph2D: React.FC<NetworkGraph2DProps> = ({ data, onNodeClic
   }, []);
 
   function getNodeRadius(node: SimNode): number {
-    return Math.max(6, Math.min(28, 6 + node.pagerank * 22));
+    // Increase baseline size from 6 to 14 so nodes remain visible at low scales (zoomed out)
+    return Math.max(14, Math.min(32, 14 + node.pagerank * 25));
   }
 
   // Get node at canvas point (accounting for transform)
