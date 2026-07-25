@@ -357,9 +357,48 @@ a { color: inherit; text-decoration: none; }
   display: block;
 }
 
-/* Responsive */
+/* Responsive & Print styles */
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
   .ticker-track { animation: none !important; overflow-x: auto; }
 }
+
+@media print {
+  /* Hide non-report interactive elements */
+  nav, footer, .ticker-wrap, .no-print, button, form, input, .escalation-btn, select, [role="tablist"] {
+    display: none !important;
+  }
+
+  body, html {
+    background: #FFFFFF !important;
+    color: #000000 !important;
+    font-size: 11px !important;
+  }
+
+  /* Reset layout constraints for print */
+  main, .max-w-\[1220px\], .container {
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Prevent elements from being chopped mid-page */
+  .neu-card, .kpi-card, tr, .terminal, .border-2, .border-3 {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Ensure narrative text inside dark terminal is fully visible in high contrast black/white */
+  .terminal {
+    background: #FFFFFF !important;
+    color: #000000 !important;
+    border: 2px solid #000000 !important;
+    box-shadow: none !important;
+  }
+  
+  .terminal-line {
+    color: #000000 !important;
+  }
+}
+

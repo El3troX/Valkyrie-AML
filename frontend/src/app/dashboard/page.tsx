@@ -388,8 +388,8 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    <NeuCard className="bg-[#0A0A0F] text-[#F2F0EB] font-mono text-xs p-5 max-h-[300px] overflow-y-auto leading-relaxed border-[#F2F0EB]/30">
-                      <div className="text-[#D4A843] font-bold border-b border-white/20 pb-2 mb-3">SAR NARRATIVE DRAFT:</div>
+                    <NeuCard className="bg-[#0A0A0F] text-white font-semibold font-mono text-xs p-5 max-h-[500px] overflow-y-auto leading-relaxed border-[#F2F0EB]/30 whitespace-pre-wrap">
+                      <div className="text-[#D4A843] font-bold border-b border-white/20 pb-2 mb-3 uppercase tracking-widest text-sm">SAR NARRATIVE DRAFT (COMPLIANCE POINTERS):</div>
                       {sarNarrative}
                     </NeuCard>
 

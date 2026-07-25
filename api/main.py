@@ -791,6 +791,7 @@ def _generate_summary_grok(query: str, results: dict, classified: dict) -> str:
         "You are Valkyrie, an AML compliance agent. "
         "Summarize the following investigation results for a compliance officer. "
         "Highlight key findings, risk levels, and recommended next steps. "
+        "CRITICAL RULE: If the user asks a question like 'Which ID / which account has the most suspicious transactions?', you MUST explicitly state the single final account ID (e.g. Account #XXXX) at the very beginning of your response. Do not bury it in a paragraph. State it clearly as: 'Account #[ID] had the most suspicious transactions.' followed by details."
         "Be concise (2-4 sentences). Format as plain text."
     )
 
