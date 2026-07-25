@@ -390,7 +390,7 @@ a { color: inherit; text-decoration: none; }
   }
 
   /* Ensure narrative text inside dark terminal is fully visible in high contrast black/white */
-  .terminal {
+  .terminal, .bg-\[\#0A0A0F\], .bg-\[\#0A0A0F\] *, [class*="bg-[#0A0A0F]"], [class*="bg-[#0A0A0F]"] * {
     background: #FFFFFF !important;
     color: #000000 !important;
     border: 2px solid #000000 !important;

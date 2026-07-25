@@ -84,7 +84,7 @@ export default function LandingPage() {
               </a>
             </div>
 
-            <p className="font-mono text-[9px] text-[#6b6f76] mt-6 uppercase tracking-wider">
+            <p className="font-mono text-[9px] text-[#6b6f76] mt-12 uppercase tracking-wider">
               Powered by RandomForest + personalized pagerank + shap explainers
             </p>
           </div>
@@ -219,31 +219,31 @@ export default function LandingPage() {
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="border-3 border-[#0A0A0A] p-6 bg-[#F2F0EB] relative">
+            <div className="border-3 border-[#0A0A0A] p-6 pt-10 bg-[#F2F0EB] relative">
               <div className="absolute -top-6 left-6 h-10 w-10 bg-[#0A0A0A] text-[#D4A843] border-3 border-[#D4A843] font-display font-bold flex items-center justify-center">
                 01
               </div>
-              <h3 className="font-display font-bold text-base mt-4 mb-3">1. NATURAL LANGUAGE ROUTING</h3>
+              <h3 className="font-display font-bold text-base mt-2 mb-3">1. NATURAL LANGUAGE ROUTING</h3>
               <p className="font-mono text-[11px] text-[#2b2b2b] leading-relaxed">
                 Query parsing extracts dates, amounts, account IDs, segments, and laundering typologies (structuring/layering/smurfing).
               </p>
             </div>
 
-            <div className="border-3 border-[#0A0A0A] p-6 bg-[#F2F0EB] relative">
+            <div className="border-3 border-[#0A0A0A] p-6 pt-10 bg-[#F2F0EB] relative">
               <div className="absolute -top-6 left-6 h-10 w-10 bg-[#0A0A0A] text-[#D4A843] border-3 border-[#D4A843] font-display font-bold flex items-center justify-center">
                 02
               </div>
-              <h3 className="font-display font-bold text-base mt-4 mb-3">2. TOOL ENSEMBLE EXECUTION</h3>
+              <h3 className="font-display font-bold text-base mt-2 mb-3">2. TOOL ENSEMBLE EXECUTION</h3>
               <p className="font-mono text-[11px] text-[#2b2b2b] leading-relaxed">
                 Invokes the exact subsystem: Transaction Search, PageRank Propagation, Chain Tracer, Model Evaluator, or SHAP Explainer.
               </p>
             </div>
 
-            <div className="border-3 border-[#0A0A0A] p-6 bg-[#F2F0EB] relative">
+            <div className="border-3 border-[#0A0A0A] p-6 pt-10 bg-[#F2F0EB] relative">
               <div className="absolute -top-6 left-6 h-10 w-10 bg-[#0A0A0A] text-[#D4A843] border-3 border-[#D4A843] font-display font-bold flex items-center justify-center">
                 03
               </div>
-              <h3 className="font-display font-bold text-base mt-4 mb-3">3. COMPLIANCE EXPLANATION</h3>
+              <h3 className="font-display font-bold text-base mt-2 mb-3">3. COMPLIANCE EXPLANATION</h3>
               <p className="font-mono text-[11px] text-[#2b2b2b] leading-relaxed">
                 Synthesizes tool output, calculates SHAP contributions, classes overall risk level, generates SAR draft text, and prints actions.
               </p>

@@ -129,28 +129,30 @@ export const PerformancePanel: React.FC<PerformancePanelProps> = ({
         {/* Per-Typology performance */}
         <NeuCard>
           <h4 className="font-display font-extrabold text-sm mb-4">Per-Typology Breakdown</h4>
-          <table className="neu-table">
-            <thead>
-              <tr>
-                <th>Typology</th>
-                <th>Precision</th>
-                <th>Recall</th>
-                <th>F1</th>
-                <th>Support</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(o.by_typology || {}).map(([typology, metrics]) => (
-                <tr key={typology}>
-                  <td className="font-bold capitalize">{typology}</td>
-                  <td>{formatPercentage(metrics.precision)}</td>
-                  <td>{formatPercentage(metrics.recall)}</td>
-                  <td className="font-bold text-[#D4A843]">{formatPercentage(metrics.f1)}</td>
-                  <td className="text-[#6b6f76]">{metrics.support}</td>
+          <div className="overflow-x-auto">
+            <table className="neu-table">
+              <thead>
+                <tr>
+                  <th>Typology</th>
+                  <th>Precision</th>
+                  <th>Recall</th>
+                  <th>F1</th>
+                  <th>Support</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {Object.entries(o.by_typology || {}).map(([typology, metrics]) => (
+                  <tr key={typology}>
+                    <td className="font-bold capitalize">{typology}</td>
+                    <td>{formatPercentage(metrics.precision)}</td>
+                    <td>{formatPercentage(metrics.recall)}</td>
+                    <td className="font-bold text-[#D4A843]">{formatPercentage(metrics.f1)}</td>
+                    <td className="text-[#6b6f76]">{metrics.support}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </NeuCard>
       </div>
 
