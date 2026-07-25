@@ -200,72 +200,123 @@ export const NetworkGraph2D: React.FC<NetworkGraph2DProps> = ({ data, onNodeClic
     for (const edge of edges) {
       const s = edge.sourceNode;
       const t = edge.targetNode;
-      const dx = t.x - s.x;
-      const dy = t.y - s.y;
-      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-      const nx = dx / dist;
-      const ny = dy / dist;
-
+      
       // Node radii
       const rS = getNodeRadius(s);
       const rT = getNodeRadius(t);
 
-      // Start/end points offset by node radius
-      const x1 = s.x + nx * rS;
-      const y1 = s.y + ny * rS;
-      const x2 = t.x - nx * (rT + 8); // leave room for arrowhead
-      const y2 = t.y - ny * (rT + 8);
+      // Determine if there is a bidirectional link between these two nodes
+      const hasBi = edges.some(e => e.source === edge.target && e.target === edge.source);
+      // Consistent order to determine curve direction
+      const isReverse = edge.source > edge.target;
 
-      // Edge line color based on risk
+      let x1 = s.x;
+      let y1 = s.y;
+      let x2 = t.x;
+      let y2 = t.y;
+
+      let mx = (x1 + x2) / 2;
+      let my = (y1 + y2) / 2;
+      let cpX = mx;
+      let cpY = my;
+
+      if (hasBi) {
+        // Curve offset normal to the line
+        const dxLine = x2 - x1;
+        const dyLine = y2 - y1;
+        const distLine = Math.sqrt(dxLine * dxLine + dyLine * dyLine) || 0.1;
+        const nxNormal = -dyLine / distLine;
+        const nyNormal = dxLine / distLine;
+        
+        // Offset cpX and cpY to create a quadratic curve
+        const curveOffset = 30; // curve offset height
+        const dir = isReverse ? 1 : -1;
+        cpX = mx + nxNormal * curveOffset * dir;
+        cpY = my + nyNormal * curveOffset * dir;
+
+        // Recalculate true midpoint of the quadratic bezier curve for the label
+        mx = 0.25 * x1 + 0.5 * cpX + 0.25 * x2;
+        my = 0.25 * y1 + 0.5 * cpY + 0.25 * y2;
+      }
+
+      // Calculate tangent vectors at start and end for node offsets and arrows
+      const dxStart = cpX - x1;
+      const dyStart = cpY - y1;
+      const distStart = Math.sqrt(dxStart * dxStart + dyStart * dyStart) || 0.1;
+      
+      const dxEnd = x2 - cpX;
+      const dyEnd = y2 - cpY;
+      const distEnd = Math.sqrt(dxEnd * dxEnd + dyEnd * dyEnd) || 0.1;
+
+      // Adjust endpoints to sit cleanly on node borders
+      const px1 = x1 + (dxStart / distStart) * rS;
+      const py1 = y1 + (dyStart / distStart) * rS;
+      const px2 = x2 - (dxEnd / distEnd) * (rT + 6);
+      const py2 = y2 - (dyEnd / distEnd) * (rT + 6);
+
+      // Edge styling
       const isHighRisk = s.color === '#E63946' || t.color === '#E63946';
-      const edgeColor = isHighRisk ? 'rgba(230,57,70,0.5)' : 'rgba(100,120,160,0.3)';
+      const edgeColor = isHighRisk ? '#E63946' : 'rgba(100,120,160,0.35)';
 
       ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x2, y2);
+      ctx.moveTo(px1, py1);
+      if (hasBi) {
+        ctx.quadraticCurveTo(cpX, cpY, px2, py2);
+      } else {
+        ctx.lineTo(px2, py2);
+      }
       ctx.strokeStyle = edgeColor;
-      ctx.lineWidth = 1 / scale;
+      ctx.lineWidth = isHighRisk ? 1.5 / scale : 1.0 / scale;
+      
+      // Animated dashed effect for high risk edges
+      if (isHighRisk) {
+        ctx.setLineDash([4 / scale, 4 / scale]);
+        ctx.lineDashOffset = -tickRef.current * 0.2;
+      } else {
+        ctx.setLineDash([]);
+      }
       ctx.stroke();
+      ctx.setLineDash([]); // Reset line dash
 
-      // Arrowhead
+      // Draw arrowhead at px2, py2 aligned with tangent
       const arrowLen = 8 / scale;
       const arrowAngle = 0.4;
-      const ax = x2 - nx * arrowLen;
-      const ay = y2 - ny * arrowLen;
-      ctx.beginPath();
-      ctx.moveTo(x2, y2);
-      ctx.lineTo(
-        ax - Math.cos(Math.atan2(ny, nx) - arrowAngle) * arrowLen * 0.7,
-        ay - Math.sin(Math.atan2(ny, nx) - arrowAngle) * arrowLen * 0.7
-      );
-      ctx.moveTo(x2, y2);
-      ctx.lineTo(
-        ax - Math.cos(Math.atan2(ny, nx) + arrowAngle) * arrowLen * 0.7,
-        ay - Math.sin(Math.atan2(ny, nx) + arrowAngle) * arrowLen * 0.7
-      );
-      ctx.strokeStyle = edgeColor;
-      ctx.lineWidth = 1.5 / scale;
-      ctx.stroke();
+      const nxEnd = dxEnd / distEnd;
+      const nyEnd = dyEnd / distEnd;
+      const ax = px2 - nxEnd * arrowLen;
+      const ay = py2 - nyEnd * arrowLen;
+      const angle = Math.atan2(nyEnd, nxEnd);
 
-      // Edge label (amount) — only show if scale large enough
-      if (scale > 0.4) {
-        const mx = (s.x + t.x) / 2;
-        const my = (s.y + t.y) / 2;
+      ctx.beginPath();
+      ctx.moveTo(px2, py2);
+      ctx.lineTo(
+        px2 - Math.cos(angle - arrowAngle) * arrowLen,
+        py2 - Math.sin(angle - arrowAngle) * arrowLen
+      );
+      ctx.lineTo(
+        px2 - Math.cos(angle + arrowAngle) * arrowLen,
+        py2 - Math.sin(angle + arrowAngle) * arrowLen
+      );
+      ctx.closePath();
+      ctx.fillStyle = edgeColor;
+      ctx.fill();
+
+      // Edge label (amount) — only show if scale is reasonable
+      if (scale > 0.45) {
         const label = formatAmount(edge.amount);
-        const fontSize = Math.max(8, 10 / scale);
+        const fontSize = Math.max(8, Math.min(10, 8 / scale));
         ctx.font = `bold ${fontSize}px "JetBrains Mono", monospace`;
         const tw = ctx.measureText(label).width;
 
-        // Label background
-        ctx.fillStyle = 'rgba(10,10,15,0.85)';
+        // Neubrutalist small label pill
+        ctx.fillStyle = '#0A0A0F';
         ctx.fillRect(mx - tw / 2 - 3, my - fontSize / 2 - 2, tw + 6, fontSize + 4);
 
-        // Label border
-        ctx.strokeStyle = 'rgba(212,168,67,0.4)';
-        ctx.lineWidth = 0.5 / scale;
+        ctx.strokeStyle = isHighRisk ? '#E63946' : 'rgba(212,168,67,0.45)';
+        ctx.lineWidth = 1 / scale;
         ctx.strokeRect(mx - tw / 2 - 3, my - fontSize / 2 - 2, tw + 6, fontSize + 4);
 
-        ctx.fillStyle = '#D4A843';
+        ctx.fillStyle = isHighRisk ? '#E63946' : '#D4A843';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(label, mx, my);
@@ -277,31 +328,37 @@ export const NetworkGraph2D: React.FC<NetworkGraph2DProps> = ({ data, onNodeClic
       const r = getNodeRadius(node);
       const isHovered = hoveredNodeRef.current?.id === node.id;
 
-      // Glow for high-risk nodes
+      // Glow effect for high-risk nodes (layering hubs)
       if (node.color === '#E63946' || node.color === '#F97316') {
-        const glow = ctx.createRadialGradient(node.x, node.y, r * 0.5, node.x, node.y, r * 2.5);
-        glow.addColorStop(0, node.color + '40');
+        const glow = ctx.createRadialGradient(node.x, node.y, r * 0.4, node.x, node.y, r * 2.2);
+        glow.addColorStop(0, node.color + '33');
         glow.addColorStop(1, 'transparent');
         ctx.beginPath();
-        ctx.arc(node.x, node.y, r * 2.5, 0, Math.PI * 2);
+        ctx.arc(node.x, node.y, r * 2.2, 0, Math.PI * 2);
         ctx.fillStyle = glow;
         ctx.fill();
       }
 
-      // Node body — neubrutualism: flat color + hard border
+      // Neubrutalist drop shadow (solid offset black circle)
+      ctx.beginPath();
+      ctx.arc(node.x + 3.5 / scale, node.y + 3.5 / scale, r, 0, Math.PI * 2);
+      ctx.fillStyle = '#0A0A0A';
+      ctx.fill();
+
+      // Node body
       ctx.beginPath();
       ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
       ctx.fillStyle = node.color;
       ctx.fill();
 
-      // Hard black border (neubrutualism)
+      // Hard black border (neubrutualism style)
       ctx.beginPath();
       ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
       ctx.strokeStyle = isHovered ? '#D4A843' : '#0A0A0A';
-      ctx.lineWidth = isHovered ? 3 / scale : 2 / scale;
+      ctx.lineWidth = isHovered ? 3 / scale : 2.2 / scale;
       ctx.stroke();
 
-      // Hover ring
+      // Hover dash ring
       if (isHovered) {
         ctx.beginPath();
         ctx.arc(node.x, node.y, r + 6 / scale, 0, Math.PI * 2);
@@ -312,19 +369,20 @@ export const NetworkGraph2D: React.FC<NetworkGraph2DProps> = ({ data, onNodeClic
         ctx.setLineDash([]);
       }
 
-      // Node label (account ID, truncated)
+      // Node label (truncated account ID)
       if (scale > 0.3) {
-        const fontSize = Math.max(7, Math.min(11, 9 / scale));
+        const fontSize = Math.max(7, Math.min(10, 8.5 / scale));
         ctx.font = `bold ${fontSize}px "JetBrains Mono", monospace`;
         const shortId = node.id.length > 10 ? node.id.slice(0, 10) : node.id;
         const labelW = ctx.measureText(shortId).width;
 
         // Label pill background
-        const ly = node.y + r + 10 / scale;
-        ctx.fillStyle = 'rgba(10,10,15,0.9)';
+        const ly = node.y + r + 11 / scale;
+        ctx.fillStyle = 'rgba(10,10,15,0.95)';
         ctx.fillRect(node.x - labelW / 2 - 4, ly - fontSize / 2 - 2, labelW + 8, fontSize + 4);
-        ctx.strokeStyle = node.color + 'AA';
-        ctx.lineWidth = 0.8 / scale;
+        
+        ctx.strokeStyle = node.color;
+        ctx.lineWidth = 1 / scale;
         ctx.strokeRect(node.x - labelW / 2 - 4, ly - fontSize / 2 - 2, labelW + 8, fontSize + 4);
 
         ctx.fillStyle = '#F2F0EB';
