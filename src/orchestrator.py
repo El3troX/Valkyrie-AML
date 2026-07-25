@@ -119,6 +119,22 @@ TOOLS = [
             },
         },
     },
+    {
+        "name": "rank_accounts_by_suspicion",
+        "description": (
+            "Aggregate all transactions by sender account and rank by number of flagged "
+            "suspicious transactions. Use when the user asks which account has the MOST "
+            "suspicious/flagged transactions, or wants a ranked list of top suspicious accounts. "
+            "Returns: top_account (single best answer), ranked_accounts list, metric used."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "top_n": {"type": "integer", "description": "Number of top accounts to return (default 1 for 'which account')."},
+                "min_score": {"type": "number", "description": "Anomaly score threshold to count a transaction as suspicious (default 0.5)."},
+            },
+        },
+    },
 ]
 
 # ---------------------------------------------------------------------------
@@ -472,6 +488,7 @@ class ValkyrieToolExecutor:
             "evaluate_model": self._tool_evaluate,
             "generate_sar": self._tool_generate_sar,
             "get_illustrative_cases": self._tool_illustrative_cases,
+            "rank_accounts_by_suspicion": self._tool_rank_accounts_by_suspicion,
         }
 
     def dispatch(self, name: str, params: dict) -> Any:
@@ -679,6 +696,58 @@ class ValkyrieToolExecutor:
         cases = find_illustrative_cases(df_labeled, self.anomaly_scores, n=n)
         print(f"[Tool:get_illustrative_cases] Returning {len(cases)} case(s)")
         return cases.to_dict(orient="records")
+
+    def _tool_rank_accounts_by_suspicion(self, params: dict) -> dict:
+        """Aggregate by account to find which account has the most suspicious transactions."""
+        print(f"  [Tool:rank_accounts_by_suspicion] params={params}")
+        top_n = int(params.get("top_n", 1))
+        min_score = float(params.get("min_score", 0.5))
+
+        df = self.df.copy()
+        df["_score"] = self.anomaly_scores
+        df["_flagged"] = (self.anomaly_scores >= min_score).astype(int)
+
+        # Aggregate per sender account
+        stats = df.groupby("Sender_account").agg(
+            total_transactions=("Amount", "count"),
+            flagged_count=("_flagged", "sum"),
+            total_sent=("Amount", "sum"),
+            max_score=("_score", "max"),
+            mean_score=("_score", "mean"),
+        ).reset_index()
+
+        # Only accounts that have at least one flagged transaction
+        stats = stats[stats["flagged_count"] > 0]
+        # Primary sort: flagged_count desc, secondary: max_score desc
+        stats = stats.sort_values(
+            ["flagged_count", "max_score"], ascending=[False, False]
+        ).head(top_n)
+
+        ranked = []
+        for _, row in stats.iterrows():
+            ranked.append({
+                "account_id": str(row["Sender_account"]),
+                "flagged_transactions": int(row["flagged_count"]),
+                "total_transactions": int(row["total_transactions"]),
+                "total_sent": round(float(row["total_sent"]), 2),
+                "max_score": round(float(row["max_score"]), 4),
+                "mean_score": round(float(row["mean_score"]), 4),
+                "flag_rate": round(float(row["flagged_count"]) / max(float(row["total_transactions"]), 1), 4),
+            })
+
+        top = ranked[0] if ranked else {}
+        print(
+            f"[Tool:rank_accounts_by_suspicion] Top account: {top.get('account_id', 'N/A')} "
+            f"with {top.get('flagged_transactions', 0)} flagged txns, "
+            f"max_score={top.get('max_score', 0):.4f}"
+        )
+        return {
+            "top_account": top,
+            "ranked_accounts": ranked,
+            "n_returned": len(ranked),
+            "metric": "flagged_transaction_count",
+            "threshold_used": min_score,
+        }
 
 
 # ---------------------------------------------------------------------------

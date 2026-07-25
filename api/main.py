@@ -583,9 +583,11 @@ def _detect_intent(query: str) -> dict:
     if m5:
         filters["min_transactions"] = int(m5.group(1))
 
-    # Pattern
+    # Pattern — order matters: most specific first
     pattern = "general"
-    if any(w in q for w in ["structur", "smurfing", "smurf"]):
+    if any(w in q for w in ["most suspicious", "most flagged", "highest number", "which id", "which account", "top account", "most transactions"]):
+        pattern = "most_suspicious_account"
+    elif any(w in q for w in ["structur", "smurfing", "smurf"]):
         pattern = "structuring_smurfing"
     elif any(w in q for w in ["layer", "chain", "flow"]):
         pattern = "layering"
@@ -600,6 +602,7 @@ def _detect_intent(query: str) -> dict:
 
     # Tool selection based on pattern
     tools_map = {
+        "most_suspicious_account": ["rank_accounts_by_suspicion", "trace_fund_flows"],
         "structuring_smurfing": ["search_transactions", "get_anomaly_scores", "get_shap_explanation"],
         "layering": ["trace_fund_flows", "compute_network_risk", "get_anomaly_scores"],
         "network_risk": ["compute_network_risk", "trace_fund_flows"],
@@ -611,7 +614,9 @@ def _detect_intent(query: str) -> dict:
     tools = tools_map.get(pattern, tools_map["general"])
 
     # Determine type
-    if pattern == "single_entity":
+    if pattern == "most_suspicious_account":
+        intent_type = "account_ranking"
+    elif pattern == "single_entity":
         intent_type = "single_entity_lookup"
     elif pattern == "evaluation":
         intent_type = "model_evaluation"
@@ -702,6 +707,11 @@ def _fallback_plan(query: str) -> dict:
             params["top_n"] = filters.get("top_n", 10)
         elif tool_name == "get_shap_explanation":
             pass
+        elif tool_name == "rank_accounts_by_suspicion":
+            # top_n=1 by default — the user wants a single answer
+            top_n = filters.get("top_n", 1)
+            params["top_n"] = top_n
+            params["min_score"] = 0.5
         elif tool_name == "trace_fund_flows":
             if "account_id" in filters:
                 params["source_account"] = filters["account_id"]
@@ -727,7 +737,15 @@ def _classify_results(results: dict, sys_data: dict) -> dict:
             classified[tool_name] = result
             continue
 
-        if "top_anomalies" in result:
+        if "top_account" in result:
+            top = result.get("top_account", {})
+            if top:
+                score = top.get("max_score", 0)
+                top["risk_level"] = risk_label(score)
+                top["escalation"] = escalation_action(score)
+            classified[tool_name] = {**result, "top_account": top}
+
+        elif "top_anomalies" in result:
             enriched = []
             for item in result["top_anomalies"]:
                 score = item.get("score", 0)
@@ -776,42 +794,73 @@ def _generate_summary_grok(query: str, results: dict, classified: dict) -> str:
         "Be concise (2-4 sentences). Format as plain text."
     )
 
-    # Build context
+    # Build context — handle every possible tool result shape
     parts = []
     for tool_name, result in results.items():
-        if isinstance(result, dict):
-            if "top_anomalies" in result:
-                top = result["top_anomalies"]
-                total_amt = result.get("total_amount", sum(t.get("amount", 0) for t in top))
-                if top:
-                    parts.append(
-                        f"Detected {len(top)} high-risk transactions, "
-                        f"highest score: {top[0].get('score', 0):.3f}, "
-                        f"total flagged amount: ${total_amt:,.0f}"
-                    )
-            elif "account_id" in result and "n_transactions" in result:
-                total_amt = result.get("total_amount", 0)
+        if not isinstance(result, dict):
+            continue
+
+        # rank_accounts_by_suspicion — most important: single definitive answer
+        if "top_account" in result:
+            top = result["top_account"]
+            if top:
+                flag_rate_pct = round(top.get("flag_rate", 0) * 100, 1)
                 parts.append(
-                    f"Account {result['account_id']}: {result['n_transactions']} transactions "
-                    f"totaling ${total_amt:,.0f}, max risk score: {result.get('max_score', 0):.3f}, "
-                    f"{result.get('flagged', 0)} flagged above threshold"
+                    f"ANSWER: Account #{top['account_id']} had the most suspicious transactions. "
+                    f"It sent {top['flagged_transactions']} flagged transactions out of "
+                    f"{top['total_transactions']} total (flag rate: {flag_rate_pct}%), "
+                    f"totaling ${top['total_sent']:,.0f} sent, "
+                    f"with a maximum anomaly score of {top['max_score']:.4f}. "
+                    f"This account should be escalated for immediate SAR filing."
                 )
-            elif "n_transactions" in result:
-                total_amt = result.get("total_amount", 0)
+
+        # get_anomaly_scores — top-N list
+        elif "top_anomalies" in result:
+            top = result["top_anomalies"]
+            total_amt = result.get("total_amount", sum(t.get("amount", 0) for t in top))
+            if top:
                 parts.append(
-                    f"Found {result['n_transactions']} matching transactions totaling ${total_amt:,.0f}"
+                    f"Detected {len(top)} high-risk transactions, "
+                    f"highest score: {top[0].get('score', 0):.3f}, "
+                    f"total flagged amount: ${total_amt:,.0f}"
                 )
-            elif "n_chains" in result:
-                parts.append(f"Found {result['n_chains']} layering chains from source account")
-            elif "n_scored" in result:
-                parts.append(f"Network risk scored {result['n_scored']} accounts via PageRank")
-            elif "narrative" in result:
-                parts.append(f"SAR generated for account {result.get('account_id', '')}")
+
+        # get_anomaly_scores — per-account lookup
+        elif "account_id" in result and "n_transactions" in result:
+            total_amt = result.get("total_amount", 0)
+            parts.append(
+                f"Account {result['account_id']}: {result['n_transactions']} transactions "
+                f"totaling ${total_amt:,.0f}, max risk score: {result.get('max_score', 0):.3f}, "
+                f"{result.get('flagged', 0)} flagged above threshold"
+            )
+
+        # search_transactions
+        elif "n_transactions" in result:
+            total_amt = result.get("total_amount", 0)
+            parts.append(
+                f"Found {result['n_transactions']} matching transactions totaling ${total_amt:,.0f}"
+            )
+
+        # trace_fund_flows
+        elif "n_chains" in result:
+            src = result.get("source_account", "")
+            parts.append(
+                f"Traced {result['n_chains']} layering chains from account {src} "
+                f"(max chain length: {result.get('max_chain_length', 0)} hops)"
+            )
+
+        # compute_network_risk
+        elif "n_scored" in result:
+            parts.append(f"Network risk scored {result['n_scored']} accounts via Personalised PageRank")
+
+        # generate_sar
+        elif "narrative" in result:
+            parts.append(f"SAR narrative compiled for account {result.get('account_id', '')}")
 
     context = "; ".join(parts) if parts else "No significant findings."
 
     if not api_key:
-        return f"Investigation complete. Query: '{query}'. Findings: {context}. Review flagged transactions and take appropriate action."
+        return f"Investigation complete. {context}"
 
     try:
         payload = {

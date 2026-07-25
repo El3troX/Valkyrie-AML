@@ -1,129 +1,209 @@
-# 🛡️ Valkyrie-AML — Compliance Investigation Agent
+# 🛡️ Valkyrie AML — AI-Powered Anti-Money Laundering Agent
 
-Valkyrie-AML is a compliance investigation agent for detecting money laundering in financial transaction networks. Built for the SAML-D dataset, it combines **unsupervised anomaly detection (Isolation Forest)**, **graph-based risk propagation (Personalized PageRank)**, **SHAP explainability**, and an **LLM-driven orchestrator (Ollama Gemma4:e4b)** to surface suspicious activity, trace fund flows, and generate Suspicious Activity Reports (SARs).
+> **Hackathon Submission** — Intelligent, agentic AML compliance system that autonomously investigates financial crime using ML anomaly detection, graph analysis, and LLM-powered reasoning.
 
-## Dataset
+---
 
-This project uses the **SAML-D (Synthetic Anti-Money Laundering) Dataset** available on Kaggle:
+## 🌟 Overview
 
-- **Source**: [berkanoztas/synthetic-transaction-monitoring-dataset-aml](https://www.kaggle.com/datasets/berkanoztas/synthetic-transaction-monitoring-dataset-aml)
-- **Rows**: ~9.5M
-- **Schema**: `Time`, `Date`, `Sender_account`, `Receiver_account`, `Amount`, `Payment_currency`, `Received_currency`, `Sender_bank_location`, `Receiver_bank_location`, `Payment_type`, `Is_laundering`, `Laundering_type`
-- **Laundering typologies**: Structuring, Smurfing, Layering, plus normal transaction patterns
+Valkyrie is a fully agentic AML investigation platform built for financial compliance teams. Given a natural-language query from a compliance officer, Valkyrie:
 
-### Setup
+1. **Detects intent** — classifies the query into investigation typologies (structuring, layering, network risk, SAR generation, model evaluation, account ranking)
+2. **Plans a tool sequence** — uses Grok-3 (xAI) to generate an ordered execution plan
+3. **Executes multi-step tools** — runs anomaly detection, fund flow tracing, graph centrality scoring, SHAP explanations in sequence
+4. **Classifies risk** — enriches every result with CRITICAL / HIGH / MEDIUM / LOW labels and escalation actions
+5. **Summarizes findings** — Grok-3 compiles a compliance-grade natural language summary
 
-1. **Place the dataset** at `data/SAML-D.csv` (download from Kaggle and copy to the `data/` directory)
-2. The system will load the CSV directly — no preprocessing needed.
+The agent never gives a one-shot LLM response. Every answer is backed by real data from 200,000 transactions.
 
-## Quick Start
+---
 
+## 🏗️ Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                   Next.js Frontend                       │
+│  Dashboard · Network Graph · Investigation Terminal      │
+│  Risk Ticker · Performance Panel · SAR Generator        │
+└────────────────────┬───────────────────────────────────-┘
+                     │ SSE streaming (real-time events)
+┌────────────────────▼────────────────────────────────────┐
+│                FastAPI Backend (api/main.py)             │
+│                                                          │
+│  /api/investigate  ──► SSE stream with 5 agentic steps   │
+│  /api/stats        ──► Dashboard KPI metrics             │
+│  /api/anomalies    ──► Top suspicious transactions       │
+│  /api/network-data ──► Graph nodes + edges               │
+│  /api/generate-sar ──► FinCEN SAR narrative              │
+│  /api/structuring  ──► Structuring detection             │
+└────────────────────┬────────────────────────────────────┘
+                     │
+┌────────────────────▼────────────────────────────────────┐
+│              Agentic Orchestrator (src/)                 │
+│                                                          │
+│  ValkyrieOrchestrator  (LangGraph state machine)        │
+│  ValkyrieToolExecutor  (8 pluggable tools)              │
+│                                                          │
+│  Tools:                                                  │
+│  ├─ search_transactions          (filter by account/date/amount)  │
+│  ├─ get_anomaly_scores           (per-row ML scores)    │
+│  ├─ rank_accounts_by_suspicion   (account aggregation)  │
+│  ├─ get_shap_explanation         (feature explainability) │
+│  ├─ trace_fund_flows             (multi-hop layering)   │
+│  ├─ compute_network_risk         (Personalised PageRank) │
+│  ├─ evaluate_model               (precision/recall/F1)  │
+│  └─ generate_sar                 (FinCEN narrative)     │
+└────────────────────┬────────────────────────────────────┘
+                     │
+┌────────────────────▼────────────────────────────────────┐
+│                ML Subsystems (src/)                      │
+│                                                          │
+│  SupervisedDetector   — XGBoost on 200K SAML-D rows     │
+│  ExplainabilityEngine — SHAP values for each prediction │
+│  TransactionGraph     — NetworkX + Personalised PageRank│
+│  ReportCompiler       — FinCEN/FATF SAR narratives      │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+## ✨ Key Features
+
+| Feature | Description |
+|---|---|
+| **Agentic Pipeline** | Multi-step LangGraph orchestration with Grok-3 planning |
+| **Real Data** | 200,000 transactions from SAML-D dataset loaded at startup |
+| **ML Detection** | XGBoost supervised detector with per-row anomaly scores |
+| **SHAP Explainability** | Every flagged transaction explained in plain English |
+| **Graph Analysis** | Personalised PageRank risk propagation across sender/receiver network |
+| **Fund Flow Tracing** | Multi-hop layering chain detection (up to N hops) |
+| **SAR Generation** | FinCEN-compliant Suspicious Activity Report narratives via Grok-3 |
+| **Structuring Detection** | Identify smurfing patterns (sub-threshold multi-transaction accounts) |
+| **Live Streaming** | Investigation results streamed via Server-Sent Events (SSE) |
+| **Neubrutalist UI** | Bold, high-contrast dashboard with real-time network graph |
+
+---
+
+## 🤖 Agentic Criteria
+
+This implementation satisfies all hackathon agentic requirements:
+
+- ✅ **Multi-step automatic execution** — after receiving a query, the agent automatically runs 2–4 tool calls in sequence without any user input
+- ✅ **Query-driven tool selection** — the orchestrator (backed by Grok-3) decides which tools to run and in what order based on the intent of the query
+- ✅ **Not a one-shot LLM response** — the LLM plans a structured tool sequence; each tool hits real data and real ML models
+- ✅ **Deterministic agentic pipeline** — clear query-driven pipeline stages: intent → plan → execute → classify → summarize
+
+**Example: "Which account had the most suspicious transactions?"**
+1. Intent detected → `most_suspicious_account` pattern
+2. Tools selected → `rank_accounts_by_suspicion`, then `trace_fund_flows`
+3. `rank_accounts_by_suspicion` aggregates 200K rows, counts flagged transactions per account
+4. Returns the **single definitive answer**: Account #XXXXXXXX — N flagged, $Y total sent
+5. `trace_fund_flows` then traces layering chains from that account
+6. Grok-3 compiles a compliance-grade summary answering the exact question
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Python 3.10+
+- Node.js 18+
+- A Grok API key from [x.ai](https://x.ai)
+
+### 1. Clone and install backend
 ```bash
-# Install dependencies
+git clone https://github.com/El3troX/Valkyrie-AML.git
+cd Valkyrie-AML
+
 pip install -r requirements.txt
-
-# Run the full pipeline (train + evaluate + report)
-python run.py --full-pipeline --nrows 200000
-
-# Launch the interactive dashboard
-python run.py --dashboard
+pip install -r api/requirements-api.txt
 ```
 
-## Usage
-
-### Command-Line Interface
-
-| Command | Description |
-|---------|-------------|
-| `python run.py --full-pipeline --nrows 200000` | Train, evaluate, and report metrics on 200K rows |
-| `python run.py --evaluate --nrows 200000` | Run evaluation and print metrics only |
-| `python run.py --tune --nrows 200000` | Sweep thresholds to find optimal F1 |
-| `python run.py --dashboard` | Launch the Streamlit web dashboard |
-| `python run.py --query "Show me the most suspicious accounts"` | Run a natural-language query |
-
-### Streamlit Dashboard
-
+### 2. Set your API key
 ```bash
-python run.py --dashboard
+# Windows
+set GROK_API_KEY=your_grok_api_key_here
+
+# Linux/Mac
+export GROK_API_KEY=your_grok_api_key_here
 ```
 
-The dashboard features four tabs:
+### 3. Place the dataset
+Download **SAML-D.csv** and place it at:
+```
+Valkyrie-AML/archive/SAML-D.csv
+```
 
-1. **Investigation** — Natural-language query input; sends queries through the LLM orchestrator to plan and execute detection tasks.
-2. **Network Graph** — Interactive PyVis network visualization with nodes colored by risk score (green → yellow → red) and sized by PageRank.
-3. **Model Performance** — Precision, recall, F1, confusion matrix, and per-typology breakdown.
-4. **SAR Report** — Generate and download a Suspicious Activity Report PDF for any account.
-
-### Running with Python Modules
-
-Each module can also be run independently:
-
+### 4. Start the backend
 ```bash
-# ML detection
-python -m src.ml_subsystems          # Quick test on 50K rows
+python -m uvicorn api.main:app --host 127.0.0.1 --port 8000 --reload
+```
+> First startup takes ~60–120 seconds to load 200K rows, train the XGBoost model, build the graph, and cache everything in memory.
 
-# Evaluation (requires src/ in PYTHONPATH)
-python -m src.evaluation             # Run evaluation on 50K sample
-
-# Graph engine
-python -m src.graph_engine           # Build graph and test PPR
-
-# Orchestrator (runs locally via Ollama)
-python -m src.orchestrator           # LLM-based query planning
-
-# SAR report (runs locally via Ollama for narrative generation)
-python -m src.report_compiler        # Generate sample SAR PDF
+### 5. Start the frontend
+```bash
+cd frontend
+npm install
+npm run dev
 ```
 
-## Project Structure
+Visit **http://localhost:3000**
+
+---
+
+## 🔬 Investigation Examples
+
+Try these queries in the terminal:
+
+| Query | What the agent does |
+|---|---|
+| `Which account had the most suspicious transactions?` | Aggregates by account, ranks by flagged count → single definitive answer |
+| `Is customer 207936746 suspicious?` | Looks up all transactions, computes risk scores, runs SHAP explanation |
+| `Find structuring patterns in the last 30 days` | Filters by date, detects sub-threshold multi-transaction senders |
+| `Trace layering chains from account 123456789` | Multi-hop fund flow tracing + PageRank risk propagation |
+| `Generate a SAR for the highest risk account` | Full FinCEN SAR narrative compiled by Grok-3 |
+| `Evaluate model performance and precision/recall` | Returns precision, recall, F1, AUC at optimal threshold |
+
+---
+
+## 🗂️ Project Structure
 
 ```
-valkyrie-compliance-agent/
+Valkyrie-AML/
+├── api/
+│   ├── main.py          # FastAPI server, SSE endpoints, agentic pipeline
+│   ├── startup.py       # One-time model training + graph building (cached)
+│   └── models.py        # Pydantic request/response models
 ├── src/
-│   ├── __init__.py
-│   ├── ml_subsystems.py      # Isolation Forest + SHAP explainability
-│   ├── evaluation.py         # Precision/recall/F1, confusion matrix, illustrative cases
-│   ├── graph_engine.py       # NetworkX directed graph, Personalized PageRank, chain tracing
-│   ├── orchestrator.py       # LangGraph + Ollama query planner → tool dispatch
-│   ├── report_compiler.py    # Ollama SAR narrative + ReportLab PDF generation
-│   └── dashboard.py          # Streamlit + PyVis interactive UI
-├── data/
-│   └── SAML-D.csv            # Kaggle SAML-D dataset (not tracked in git)
-├── .streamlit/
-│   └── config.toml           # Dark theme config
-├── requirements.txt
-├── run.py                    # CLI entry point
-└── README.md
+│   ├── orchestrator.py  # ValkyrieOrchestrator + ValkyrieToolExecutor (LangGraph)
+│   ├── ml_subsystems.py # SupervisedDetector (XGBoost) + ExplainabilityEngine (SHAP)
+│   ├── graph_engine.py  # TransactionGraph (NetworkX + Personalised PageRank)
+│   ├── report_compiler.py # SAR narrative generation
+│   └── evaluation.py    # Model evaluation metrics + illustrative cases
+├── frontend/
+│   ├── src/app/dashboard/page.tsx      # Main dashboard
+│   ├── src/components/network/         # Canvas 2D network graph
+│   ├── src/components/agent/           # Investigation terminal (SSE)
+│   └── src/components/dashboard/       # Performance panel, risk ticker
+└── requirements.txt
 ```
 
-## Architecture
+---
 
-1. **ml_subsystems.py** — Engineers 6 features per transaction: sender transaction count, total volume, average amount, amount deviation (z-score), cash ratio, and near-threshold flag. Fits an IsolationForest (unsupervised) and returns anomaly scores in [0, 1]. The `ExplainabilityEngine` wraps SHAP TreeExplainer to translate model decisions into plain language.
+## 🧠 Tech Stack
 
-2. **evaluation.py** — Computes precision, recall, F1, and confusion matrix against SAML-D ground-truth labels. Supports per-typology breakdown (structuring, smurfing, layering). Finds optimal binary classification threshold by sweeping.
+| Layer | Technology |
+|---|---|
+| Frontend | Next.js 15, TypeScript, Tailwind CSS |
+| Backend | FastAPI, Python 3.10+, asyncio SSE |
+| LLM | Grok-3-mini (xAI) with Gemini fallback |
+| ML | XGBoost, SHAP |
+| Graph | NetworkX, Personalised PageRank |
+| Orchestration | LangGraph state machine |
+| Dataset | SAML-D (200,000 synthetic AML transactions) |
 
-3. **graph_engine.py** — Builds a directed NetworkX graph from the transaction DataFrame. Implements Personalized PageRank for network risk propagation from known high-risk accounts. `trace_chains()` discovers multi-hop layering paths within configurable time windows.
+---
 
-4. **orchestrator.py** — Takes a natural-language query and routes it through a LangGraph pipeline (plan_query → execute_plan → summarize) backed by Ollama Gemma4:e4b. Returns a structured JSON execution plan. Dispatches each tool call to the appropriate subsystem. Falls back to keyword routing if the LLM is unavailable.
+## 📄 License
 
-5. **report_compiler.py** — Generates SAR narratives via Ollama Gemma4:e4b (or template fallback) and compiles professional PDFs with ReportLab, including transaction tables with proper cell wrapping.
-
-6. **dashboard.py** — Streamlit app with dark theme, PyVis network graph, model performance panel, and SAR download.
-
-## Evaluation Results (200K rows)
-
-| Metric | Overall | Structuring | Smurfing | Layering |
-|--------|---------|-------------|----------|----------|
-| Precision | 0.6971 | 1.0000 | 1.0000 | 1.0000 |
-| Recall | 0.6144 | 0.8182 | 0.6286 | 0.3000 |
-| F1 Score | 0.6532 | 0.9000 | 0.7719 | 0.4615 |
-| Support | 236 | 121 | 35 | 80 |
-
-**Top detection cases** (highest-scoring true positives):
-- `sender=207936746` → `Single_large` ($161K, score=1.000)  
-- `sender=3979625953` → `Stacked Bipartite` ($9.3K, score=0.9999)  
-- `sender=6381030298` → `Cash_Withdrawal` ($148, score=0.9993)  
-
-## License
-
-This project is for hackathon / educational purposes only. The SAML-D dataset is licensed under CC-BY-NC-SA-4.0.
+MIT — Built for hackathon purposes.
