@@ -1,0 +1,365 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import "tailwindcss";
+
+/* ============================================================
+   VALKYRIE-AML — Neubrutualism Design System
+   ============================================================ */
+
+:root {
+  --bg:        #F2F0EB;
+  --ink:       #0A0A0A;
+  --paper:     #FFFFFF;
+  --grey:      #6b6f76;
+
+  /* AML Signal Colors */
+  --critical:  #E63946;
+  --high:      #F97316;
+  --medium:    #EAB308;
+  --low:       #2EC04A;
+  --info:      #5BC0EB;
+  --gold:      #D4A843;
+
+  /* Borders & Shadows */
+  --bd:        3px solid var(--ink);
+  --bd2:       2px solid var(--ink);
+  --shadow:    6px 6px 0 var(--ink);
+  --shadow-sm: 4px 4px 0 var(--ink);
+  --shadow-lg: 10px 10px 0 var(--ink);
+
+  /* Typography */
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-mono:    'JetBrains Mono', monospace;
+
+  /* Motion — rigid brutalist: one easing, three durations */
+  --ease:    cubic-bezier(0.2, 0, 0, 1);
+  --t-quick: 120ms;
+  --t-std:   350ms;
+  --t-slow:  600ms;
+}
+
+/* ---- Dark mode for dashboard ---- */
+.dark {
+  --bg:    #0A0A0F;
+  --ink:   #F2F0EB;
+  --paper: #111118;
+  --grey:  #9aa0ad;
+  --bd:    3px solid rgba(242, 240, 235, 0.6);
+  --bd2:   2px solid rgba(242, 240, 235, 0.4);
+  --shadow:    6px 6px 0 rgba(212, 168, 67, 0.5);
+  --shadow-sm: 4px 4px 0 rgba(212, 168, 67, 0.4);
+}
+
+/* ============================================================
+   BASE RESET
+   ============================================================ */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 16px;
+  line-height: 1.6;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5 {
+  font-family: var(--font-display);
+  margin: 0;
+  line-height: 1.05;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+}
+
+p { margin: 0; }
+a { color: inherit; text-decoration: none; }
+
+::selection { background: var(--gold); color: #000; }
+:focus-visible { outline: 3px solid var(--info); outline-offset: 2px; }
+
+/* ============================================================
+   NEUBRUTUALISM COMPONENT PRIMITIVES
+   ============================================================ */
+
+/* Card */
+.neu-card {
+  background: var(--paper);
+  border: var(--bd);
+  box-shadow: var(--shadow);
+  transition:
+    transform var(--t-quick) var(--ease),
+    box-shadow var(--t-quick) var(--ease);
+}
+.neu-card:hover {
+  transform: translate(-3px, -3px);
+  box-shadow: 9px 9px 0 var(--ink);
+}
+
+/* Button */
+.neu-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 12px 24px;
+  min-height: 48px;
+  background: var(--paper);
+  color: var(--ink);
+  border: var(--bd);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition:
+    transform var(--t-quick) var(--ease),
+    box-shadow var(--t-quick) var(--ease);
+}
+.neu-btn:hover  { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 var(--ink); }
+.neu-btn:active { transform: translate(2px, 2px);   box-shadow: 2px 2px 0 var(--ink); }
+
+.neu-btn-critical { background: var(--critical); color: #fff; box-shadow: 4px 4px 0 var(--ink); }
+.neu-btn-gold     { background: var(--gold); color: var(--ink); }
+.neu-btn-ink      { background: var(--ink); color: var(--bg); box-shadow: 4px 4px 0 var(--gold); }
+.neu-btn-ink:hover { box-shadow: 6px 6px 0 var(--gold); }
+
+/* Risk badges */
+.risk-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  padding: 4px 10px;
+  border: var(--bd2);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+.risk-critical { background: var(--critical); color: #fff; }
+.risk-high     { background: var(--high);     color: #fff; }
+.risk-medium   { background: var(--medium);   color: var(--ink); }
+.risk-low      { background: var(--low);      color: var(--ink); }
+
+/* Ticker */
+.ticker-wrap { background: var(--ink); color: var(--bg); border-bottom: var(--bd); overflow: hidden; }
+.ticker-track {
+  display: flex;
+  width: max-content;
+  animation: marquee 32s linear infinite;
+}
+.ticker-track:hover { animation-play-state: paused; }
+.ticker-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 28px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  white-space: nowrap;
+}
+.ticker-item b { color: var(--gold); }
+.ticker-item.critical b { color: var(--critical); }
+
+@keyframes marquee { to { transform: translateX(-50%); } }
+
+/* Blinking dot */
+.blink-dot {
+  width: 9px;
+  height: 9px;
+  border: 2px solid currentColor;
+  display: inline-block;
+  animation: blink 1.6s steps(2, start) infinite;
+}
+.blink-dot.live { background: var(--low); border-color: var(--ink); }
+@keyframes blink { 50% { opacity: 0.2; } }
+
+/* Color block divider */
+.cblock {
+  display: flex;
+  height: 18px;
+  border-top: var(--bd);
+  border-bottom: var(--bd);
+}
+.cblock i { flex: 1; display: block; }
+.cblock i:nth-child(1) { background: var(--gold); }
+.cblock i:nth-child(2) { background: var(--critical); }
+.cblock i:nth-child(3) { background: var(--info); }
+.cblock i:nth-child(4) { background: var(--low); }
+.cblock.tall { height: 28px; }
+
+/* Section tag */
+.sec-tag { display: inline-flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+.sec-tag .sw { width: 30px; height: 12px; border: var(--bd2); }
+
+/* Scroll progress bar */
+.scroll-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 4px;
+  z-index: 200;
+  background: var(--gold);
+  border-bottom: 2px solid var(--ink);
+  transform-origin: left;
+  transform: scaleX(0);
+  transition: transform 0.1s linear;
+}
+
+/* Number display */
+.display-num {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(36px, 5vw, 72px);
+  line-height: 1;
+}
+
+/* Agent terminal */
+.terminal {
+  background: #0A0A0F;
+  border: var(--bd);
+  box-shadow: var(--shadow);
+  font-family: var(--font-mono);
+  color: #F2F0EB;
+  padding: 20px;
+  min-height: 200px;
+}
+.terminal-prompt::before {
+  content: '> ';
+  color: var(--gold);
+  font-weight: 700;
+}
+.terminal-line { padding: 2px 0; font-size: 13px; line-height: 1.6; }
+.terminal-line.success { color: var(--low); }
+.terminal-line.error { color: var(--critical); }
+.terminal-line.info { color: var(--info); }
+.terminal-line.warn { color: var(--medium); }
+
+/* Typewriter cursor */
+.cursor::after {
+  content: '█';
+  animation: blink-cursor 1s steps(2, start) infinite;
+}
+@keyframes blink-cursor { 50% { opacity: 0; } }
+
+/* Tool node animation */
+.tool-node {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border: var(--bd2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  background: var(--paper);
+  transition: all var(--t-std) var(--ease);
+}
+.tool-node.active {
+  background: var(--gold);
+  box-shadow: 3px 3px 0 var(--ink);
+  transform: translate(-2px, -2px);
+}
+.tool-node.done {
+  background: var(--low);
+  color: var(--ink);
+}
+.tool-node.pending {
+  opacity: 0.4;
+}
+
+/* SHAP bar */
+.shap-bar-positive { background: var(--critical); }
+.shap-bar-negative { background: var(--info); }
+
+/* Table styles */
+.neu-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.neu-table th {
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: var(--bd);
+  background: var(--bg);
+}
+.neu-table td {
+  padding: 10px 14px;
+  border-bottom: var(--bd2);
+}
+.neu-table tr:hover td { background: rgba(212, 168, 67, 0.08); }
+
+/* KPI card */
+.kpi-card {
+  background: var(--paper);
+  border: var(--bd);
+  box-shadow: var(--shadow-sm);
+  padding: 20px 24px;
+}
+.kpi-value {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 40px;
+  line-height: 1;
+}
+.kpi-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--grey);
+  margin-top: 6px;
+}
+
+/* Navbar */
+.nav-link {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 6px 2px;
+  border-bottom: 3px solid transparent;
+  transition: border-color var(--t-quick) var(--ease);
+}
+.nav-link:hover,
+.nav-link.active { border-bottom-color: var(--gold); }
+
+/* Escalation buttons */
+.escalation-monitor { background: var(--low);      color: var(--ink); }
+.escalation-review  { background: var(--medium);   color: var(--ink); }
+.escalation-report  { background: var(--critical); color: #fff; }
+
+/* Three.js canvas */
+.three-canvas-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+.three-canvas-container canvas {
+  display: block;
+}
+
+/* Responsive */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .ticker-track { animation: none !important; overflow-x: auto; }
+}
