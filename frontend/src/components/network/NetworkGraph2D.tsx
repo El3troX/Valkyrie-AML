@@ -107,7 +107,7 @@ export const NetworkGraph2D: React.FC<NetworkGraph2DProps> = ({ data, onNodeClic
     const alpha = Math.max(0.001, 0.35 * Math.exp(-tickRef.current * 0.012));
     tickRef.current++;
 
-    // Repulsion between all nodes — stronger to prevent overlap
+    // Repulsion and Collision forces
     for (let i = 0; i < nodes.length; i++) {
       for (let j = i + 1; j < nodes.length; j++) {
         const a = nodes[i];
@@ -115,27 +115,40 @@ export const NetworkGraph2D: React.FC<NetworkGraph2DProps> = ({ data, onNodeClic
         let dx = b.x - a.x;
         let dy = b.y - a.y;
         const dist = Math.sqrt(dx * dx + dy * dy) || 0.1;
-        const minDist = getNodeRadius(a) + getNodeRadius(b) + 40;
-        // Hard collision + repulsion
-        const repulsion = (dist < minDist ? 8000 : 5000) / (dist * dist);
-        const fx = (dx / dist) * repulsion;
-        const fy = (dy / dist) * repulsion;
-        a.vx -= fx * alpha;
-        a.vy -= fy * alpha;
-        b.vx += fx * alpha;
-        b.vy += fy * alpha;
+        
+        const minDist = getNodeRadius(a) + getNodeRadius(b) + 38;
+        
+        let fx = 0;
+        let fy = 0;
+        
+        if (dist < minDist) {
+          // Strong push out for overlapping/colliding nodes
+          const push = (minDist - dist) * 0.25;
+          fx = -(dx / dist) * push;
+          fy = -(dy / dist) * push;
+        } else {
+          // Soft linear repulsion to push clusters away from each other
+          const rep = 850 / dist;
+          fx = -(dx / dist) * rep;
+          fy = -(dy / dist) * rep;
+        }
+        
+        a.vx += fx * alpha;
+        a.vy += fy * alpha;
+        b.vx -= fx * alpha;
+        b.vy -= fy * alpha;
       }
     }
 
-    // Spring attraction along edges — longer rest length
+    // Spring attraction along edges — tighter spacing to form clean clusters
     for (const edge of edges) {
       const s = edge.sourceNode;
       const t = edge.targetNode;
       const dx = t.x - s.x;
       const dy = t.y - s.y;
       const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-      const targetDist = 160; // wider spacing
-      const spring = (dist - targetDist) * 0.03 * alpha;
+      const targetDist = 95; // satellites sit close to the hub node
+      const spring = (dist - targetDist) * 0.05 * alpha;
       const fx = (dx / dist) * spring;
       const fy = (dy / dist) * spring;
       s.vx += fx;
@@ -144,15 +157,15 @@ export const NetworkGraph2D: React.FC<NetworkGraph2DProps> = ({ data, onNodeClic
       t.vy -= fy;
     }
 
-    // Centering / gravity force
+    // Centering / gravity force — very weak to prevent clusters from piling in the center
     const W = canvasRef.current?.width || 900;
     const H = canvasRef.current?.height || 600;
     for (const n of nodes) {
-      n.vx += (W / 2 - n.x) * 0.004 * alpha;
-      n.vy += (H / 2 - n.y) * 0.004 * alpha;
+      n.vx += (W / 2 - n.x) * 0.0006 * alpha;
+      n.vy += (H / 2 - n.y) * 0.0006 * alpha;
     }
 
-    // Integrate positions with stronger damping for stability
+    // Integrate positions with damping
     for (const n of nodes) {
       if (n.fx !== undefined) { n.x = n.fx; n.y = n.fy!; continue; }
       n.vx *= 0.65;
@@ -339,55 +352,40 @@ export const NetworkGraph2D: React.FC<NetworkGraph2DProps> = ({ data, onNodeClic
         ctx.fill();
       }
 
-      // Neubrutalist drop shadow (solid offset black circle)
-      ctx.beginPath();
-      ctx.arc(node.x + 3.5 / scale, node.y + 3.5 / scale, r, 0, Math.PI * 2);
-      ctx.fillStyle = '#0A0A0A';
-      ctx.fill();
-
       // Node body
       ctx.beginPath();
       ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
       ctx.fillStyle = node.color;
       ctx.fill();
 
-      // Hard black border (neubrutualism style)
+      // Hard black border (crisp flat border style)
       ctx.beginPath();
       ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
       ctx.strokeStyle = isHovered ? '#D4A843' : '#0A0A0A';
-      ctx.lineWidth = isHovered ? 3 / scale : 2.2 / scale;
+      ctx.lineWidth = isHovered ? 2.5 / scale : 1.5 / scale;
       ctx.stroke();
 
       // Hover dash ring
       if (isHovered) {
         ctx.beginPath();
-        ctx.arc(node.x, node.y, r + 6 / scale, 0, Math.PI * 2);
+        ctx.arc(node.x, node.y, r + 5 / scale, 0, Math.PI * 2);
         ctx.strokeStyle = '#D4A843';
-        ctx.lineWidth = 2 / scale;
+        ctx.lineWidth = 1.5 / scale;
         ctx.setLineDash([4 / scale, 3 / scale]);
         ctx.stroke();
         ctx.setLineDash([]);
       }
 
-      // Node label (truncated account ID)
-      if (scale > 0.3) {
-        const fontSize = Math.max(7, Math.min(10, 8.5 / scale));
+      // Node label (account ID) — minimal style matching the reference image
+      if (scale > 0.35) {
+        const fontSize = Math.max(8, Math.min(10, 8.5 / scale));
         ctx.font = `bold ${fontSize}px "JetBrains Mono", monospace`;
         const shortId = node.id.length > 10 ? node.id.slice(0, 10) : node.id;
-        const labelW = ctx.measureText(shortId).width;
-
-        // Label pill background
-        const ly = node.y + r + 11 / scale;
-        ctx.fillStyle = 'rgba(10,10,15,0.95)';
-        ctx.fillRect(node.x - labelW / 2 - 4, ly - fontSize / 2 - 2, labelW + 8, fontSize + 4);
         
-        ctx.strokeStyle = node.color;
-        ctx.lineWidth = 1 / scale;
-        ctx.strokeRect(node.x - labelW / 2 - 4, ly - fontSize / 2 - 2, labelW + 8, fontSize + 4);
-
-        ctx.fillStyle = '#F2F0EB';
+        const ly = node.y + r + 6;
+        ctx.fillStyle = isHovered ? '#D4A843' : '#E2E8F0'; // bright legible off-white / light slate
         ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
+        ctx.textBaseline = 'top';
         ctx.fillText(shortId, node.x, ly);
       }
     }
