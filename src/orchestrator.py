@@ -55,12 +55,17 @@ TOOLS = [
     },
     {
         "name": "get_anomaly_scores",
-        "description": "Get ML anomaly scores. Without account_id, returns top-N most anomalous.",
+        "description": "Get ML anomaly scores. Without account_id, returns top-N sorted anomalies.",
         "parameters": {
             "type": "object",
             "properties": {
                 "account_id": {"type": "string", "description": "Optional account ID for specific scoring."},
                 "top_n": {"type": "integer", "description": "Number of top anomalies to return."},
+                "sort": {
+                    "type": "string",
+                    "enum": ["descending", "ascending"],
+                    "description": "Sort order: 'descending' for highest risk (most anomalous), 'ascending' for lowest risk (least anomalous/most legit)."
+                }
             },
         },
     },
@@ -198,14 +203,22 @@ def _call_llm(
     max_tokens: int = 4096,
     timeout_secs: int = 15,
 ) -> str:
-    """Call Grok API with Gemini and Ollama fallbacks."""
+    """Call Grok API with Groq and Gemini fallbacks."""
     grok_key = _get_grok_api_key()
     if grok_key:
         try:
             import json, urllib.request
-            url = "https://api.x.ai/v1/chat/completions"
+            if grok_key.startswith("gsk_"):
+                # Route to Groq API using Llama 70B
+                url = "https://api.groq.com/openai/v1/chat/completions"
+                model_name = "llama-3.3-70b-versatile"
+            else:
+                # Route to x.ai Grok API
+                url = "https://api.x.ai/v1/chat/completions"
+                model_name = "grok-2-1212"
+                
             payload = {
-                "model": "grok-3-mini",
+                "model": model_name,
                 "messages": [
                     {"role": "system", "content": system},
                     {"role": "user", "content": user_message}
@@ -226,10 +239,10 @@ def _call_llm(
                 data = json.loads(resp.read().decode("utf-8"))
                 text = data["choices"][0]["message"]["content"].strip()
                 if text:
-                    print(f"[LLM] Grok API response received ({len(text)} chars)")
+                    print(f"[LLM] {model_name} response received ({len(text)} chars)")
                     return text
         except Exception as e:
-            print(f"[LLM] Grok API call failed: {e}. Trying Gemini...")
+            print(f"[LLM] LLM endpoint call failed: {e}. Trying Gemini...")
 
     api_key = _get_gemini_api_key()
     if api_key:
@@ -569,7 +582,13 @@ class ValkyrieToolExecutor:
                 "mean_score": round(float(scores.mean()), 4),
                 "flagged": flagged_count,
             }
-        top_idx = np.argsort(self.anomaly_scores)[-top_n:][::-1]
+        sort_mode = params.get("sort", "descending")
+        if sort_mode == "ascending":
+            # Lowest anomaly scores -> least suspicious/most legit
+            top_idx = np.argsort(self.anomaly_scores)[:top_n]
+        else:
+            top_idx = np.argsort(self.anomaly_scores)[-top_n:][::-1]
+            
         results = []
         total_flagged_amount = 0.0
         for idx in top_idx:
@@ -584,8 +603,10 @@ class ValkyrieToolExecutor:
                 "amount": round(amt, 2),
                 "type": str(row.get("Laundering_type", "Unknown")),
             })
-        print(f"[Tool:get_anomaly_scores] Top {len(results)} by score (range {results[-1]['score']:.4f} - {results[0]['score']:.4f}), total=${total_flagged_amount:,.0f}")
-        return {"top_anomalies": results, "total_amount": round(total_flagged_amount, 2)}
+        
+        range_str = f"{results[0]['score']:.4f} - {results[-1]['score']:.4f}" if sort_mode == "ascending" else f"{results[-1]['score']:.4f} - {results[0]['score']:.4f}"
+        print(f"[Tool:get_anomaly_scores] Sorted ({sort_mode}) {len(results)} by score (range {range_str}), total=${total_flagged_amount:,.0f}")
+        return {"top_anomalies": results, "total_amount": round(total_flagged_amount, 2), "sort": sort_mode}
 
     def _tool_shap_explanation(self, params: dict) -> dict:
         print(f"  [Tool:get_shap_explanation] params={params}")

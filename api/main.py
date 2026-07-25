@@ -583,6 +583,10 @@ def _detect_intent(query: str) -> dict:
     if m5:
         filters["min_transactions"] = int(m5.group(1))
 
+    # Sort filter for least suspicious / legit queries
+    if any(w in q for w in ["least suspicious", "legit", "most legit", "safe", "normal"]):
+        filters["sort"] = "ascending"
+
     # Pattern — order matters: most specific first
     pattern = "general"
     if any(w in q for w in ["most suspicious", "most flagged", "highest number", "which id", "which account", "top account", "most transactions"]):
@@ -634,48 +638,31 @@ def _detect_intent(query: str) -> dict:
 
 
 def _build_plan_with_grok(query: str) -> dict:
-    """Call Grok API to build execution plan. Falls back to local intent detection."""
-    from src.orchestrator import TOOLS, _system_prompt
-    import urllib.request
-
-    api_key = GROK_API_KEY
-    if not api_key:
-        return _fallback_plan(query)
+    """Call centralized LLM executor to build the dynamic execution plan."""
+    from src.orchestrator import TOOLS, _system_prompt, _call_llm
 
     tools_json = json.dumps(TOOLS, indent=2)
     user_message = (
         f"User query: {query}\n\nAvailable tools:\n{tools_json}\n\n"
         'Respond with ONLY a JSON object: {"tools": [{"name": "...", "params": {...}}]}'
     )
-    full_prompt = f"{_system_prompt}\n\nUser Message:\n{user_message}"
 
     try:
-        payload = {
-            "model": "grok-3-mini",
-            "messages": [{"role": "user", "content": full_prompt}],
-            "temperature": 0,
-            "max_tokens": 1024,
-        }
-        req = urllib.request.Request(
-            "https://api.x.ai/v1/chat/completions",
-            data=json.dumps(payload).encode("utf-8"),
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {api_key}",
-            },
-            method="POST",
+        content = _call_llm(
+            system=_system_prompt,
+            user_message=user_message,
+            model="grok-3-mini",
+            temperature=0.0
         )
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            content = data["choices"][0]["message"]["content"].strip()
-
+        if content:
             import re
-            cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", content, flags=re.MULTILINE)
+            cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", content, flags=re.MULTILINE).strip()
             parsed = json.loads(cleaned)
             if "tools" in parsed:
+                print(f"[Planner] LLM generated plan: {parsed}")
                 return parsed
     except Exception as e:
-        print(f"[Grok] Plan generation failed: {e}")
+        print(f"[Planner] Dynamic planning failed: {e}")
 
     return _fallback_plan(query)
 
@@ -705,6 +692,8 @@ def _fallback_plan(query: str) -> dict:
             if "account_id" in filters:
                 params["account_id"] = filters["account_id"]
             params["top_n"] = filters.get("top_n", 10)
+            if "sort" in filters:
+                params["sort"] = filters["sort"]
         elif tool_name == "get_shap_explanation":
             pass
         elif tool_name == "rank_accounts_by_suspicion":
@@ -820,10 +809,12 @@ def _generate_summary_grok(query: str, results: dict, classified: dict) -> str:
             top = result["top_anomalies"]
             total_amt = result.get("total_amount", sum(t.get("amount", 0) for t in top))
             if top:
+                sort_order = result.get("sort", "descending")
+                label = "low-risk/legitimate" if sort_order == "ascending" else "high-risk"
                 parts.append(
-                    f"Detected {len(top)} high-risk transactions, "
-                    f"highest score: {top[0].get('score', 0):.3f}, "
-                    f"total flagged amount: ${total_amt:,.0f}"
+                    f"Detected {len(top)} {label} transactions, "
+                    f"score range: {top[0].get('score', 0):.4f} - {top[-1].get('score', 0):.4f}, "
+                    f"total amount: ${total_amt:,.0f}"
                 )
 
         # get_anomaly_scores — per-account lookup
@@ -860,34 +851,21 @@ def _generate_summary_grok(query: str, results: dict, classified: dict) -> str:
 
     context = "; ".join(parts) if parts else "No significant findings."
 
-    if not api_key:
-        return f"Investigation complete. {context}"
-
     try:
-        payload = {
-            "model": "grok-3-mini",
-            "messages": [{
-                "role": "user",
-                "content": f"{summary_prompt}\n\nQuery: {query}\nFindings: {context}\n\nSummary:"
-            }],
-            "temperature": 0.3,
-            "max_tokens": 256,
-        }
-        req = urllib.request.Request(
-            "https://api.x.ai/v1/chat/completions",
-            data=json.dumps(payload).encode("utf-8"),
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {api_key}",
-            },
-            method="POST",
+        from src.orchestrator import _call_llm
+        user_message = f"{summary_prompt}\n\nQuery: {query}\nFindings: {context}\n\nSummary:"
+        summary = _call_llm(
+            system="You are Valkyrie, a helpful AML compliance officer assistant.",
+            user_message=user_message,
+            model="grok-3-mini",
+            temperature=0.3
         )
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            return data["choices"][0]["message"]["content"].strip()
+        if summary:
+            return summary
     except Exception as e:
-        print(f"[Grok] Summary generation failed: {e}")
-        return f"Investigation complete. {context}. Recommend reviewing flagged transactions for compliance action."
+        print(f"[Planner] Summary generation failed: {e}")
+
+    return f"Investigation complete. {context}. Recommend reviewing flagged transactions for compliance action."
 
 
 def _make_json_safe(obj):
