@@ -319,17 +319,37 @@ async def network_data(max_nodes: int = 60):
         elif score >= 0.4: return "#EAB308"
         return "#2EC04A"
 
+    # Collect connected node scores for percentile-based coloring
+    connected_scores = [score for acc, score in sorted_accs if acc in connected]
+    if connected_scores:
+        p80 = float(np.percentile(connected_scores, 80))
+        p55 = float(np.percentile(connected_scores, 55))
+        p30 = float(np.percentile(connected_scores, 30))
+    else:
+        p80, p55, p30 = 0.8, 0.6, 0.4
+
     max_ppr = max(ppr.values()) if ppr else 1.0
     nodes = []
     for acc, score in sorted_accs:
         if acc not in connected:
             continue  # skip isolated nodes
         ppr_val = float(ppr.get(acc, 0.0))
+
+        # Percentile-based coloring so the graph isn't a single color blob
+        if score >= p80:
+            node_color = "#E63946"
+        elif score >= p55:
+            node_color = "#F97316"
+        elif score >= p30:
+            node_color = "#EAB308"
+        else:
+            node_color = "#2EC04A"
+
         nodes.append({
             "id": acc,
             "risk_score": round(score, 4),
             "pagerank": round(ppr_val / max_ppr if max_ppr > 0 else 0, 4),
-            "color": _color(score),
+            "color": node_color,
             "size": 4 + 16 * (ppr_val / max_ppr if max_ppr > 0 else 0),
             "label": acc,
         })

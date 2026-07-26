@@ -29,7 +29,7 @@ data/
 # === Agent & External Folders ===
 .agents/
 .claude/
-lib/
+/lib/
 ui-ux-pro-max-skill-main/
 SKILL*.md
 set

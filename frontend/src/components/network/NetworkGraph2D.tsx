@@ -188,7 +188,7 @@ export const NetworkGraph2D: React.FC<NetworkGraph2DProps> = ({ data, onNodeClic
     if (selectedNodeRef.current) {
       setTransform({ ...transformRef.current });
     }
-  }, [selectedNode]);
+  }, []);
 
   // Draw frame
   const draw = useCallback(() => {
@@ -475,10 +475,15 @@ export const NetworkGraph2D: React.FC<NetworkGraph2DProps> = ({ data, onNodeClic
     return null;
   }, []);
 
-  // Animation loop
+  // Initialize simulation when data changes
   useEffect(() => {
     if (!data.nodes.length) return;
     initSim();
+  }, [data, initSim]);
+
+  // Animation loop — runs independently, only restarts if draw/tick change
+  useEffect(() => {
+    if (!nodesRef.current.length) return;
 
     const loop = () => {
       tick();
@@ -488,7 +493,7 @@ export const NetworkGraph2D: React.FC<NetworkGraph2DProps> = ({ data, onNodeClic
     animFrameRef.current = requestAnimationFrame(loop);
 
     return () => cancelAnimationFrame(animFrameRef.current);
-  }, [data, initSim, tick, draw]);
+  }, [tick, draw]);
 
   // Resize observer
   useEffect(() => {
